@@ -303,4 +303,6 @@ int tls_clear_certificates(struct TLSContext *context);
     void srtp_destroy(struct SRTPContext *context);
 #endif
 
+int tls_is_child(struct TLSContext *ctx);
+
 #endif

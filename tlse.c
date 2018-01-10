@@ -8754,4 +8754,7 @@ void srtp_destroy(struct SRTPContext *context) {
 
 #endif // TLS_SRTP
 
+int tls_is_child(struct TLSContext *ctx) {
+  return ctx->is_child;
+}
 #endif // TLSE_C
