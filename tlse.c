@@ -1439,7 +1439,7 @@ unsigned char *__private_tls_decrypt_rsa(struct TLSContext *context, const unsig
     unsigned long out_size = len;
     int hash_idx = find_hash("sha256");
     int res = 0;
-    err = rsa_decrypt_key_ex(buffer, len, out, &out_size, (unsigned char *)"Concept", 7, hash_idx, LTC_LTC_PKCS_1_V1_5, &res, &key);
+    err = rsa_decrypt_key_ex(buffer, len, out, &out_size, (unsigned char *)"Concept", 7, hash_idx, LTC_PKCS_1_V1_5, &res, &key);
     rsa_free(&key);
     if ((err) || (!out_size)) {
         DEBUG_PRINT("RSA DECRYPT ERROR\n");
@@ -1470,7 +1470,7 @@ unsigned char *__private_tls_encrypt_rsa(struct TLSContext *context, const unsig
     unsigned char *out = (unsigned char *)TLS_MALLOC(out_size);
     int hash_idx = find_hash("sha256");
     int prng_idx = find_prng("sprng");
-    err = rsa_encrypt_key_ex(buffer, len, out, &out_size, (unsigned char *)"Concept", 7, NULL, prng_idx, hash_idx, LTC_LTC_PKCS_1_V1_5, &key);
+    err = rsa_encrypt_key_ex(buffer, len, out, &out_size, (unsigned char *)"Concept", 7, NULL, prng_idx, hash_idx, LTC_PKCS_1_V1_5, &key);
     rsa_free(&key);
     if ((err) || (!out_size)) {
         TLS_FREE(out);
@@ -1519,7 +1519,7 @@ int __private_rsa_verify_hash_md5sha1(const unsigned char *sig, unsigned long si
     }
     
     int decoded = 0;
-    err = pkcs_1_v1_5_decode(tmpbuf, x, LTC_LTC_PKCS_1_EMSA, modulus_bitlen, out, &out_len, &decoded);
+    err = pkcs_1_v1_5_decode(tmpbuf, x, LTC_PKCS_1_EMSA, modulus_bitlen, out, &out_len, &decoded);
     if (decoded) {
         if (out_len == hashlen) {
             if (!memcmp(out, hash, hashlen))
@@ -1649,7 +1649,7 @@ int __private_tls_verify_rsa(struct TLSContext *context, unsigned int hash_type,
         err = __private_rsa_verify_hash_md5sha1(buffer, len, hash, hash_len, &rsa_stat, &key);
     else
 #endif
-        err = rsa_verify_hash_ex(buffer, len, hash, hash_len, LTC_LTC_PKCS_1_V1_5, hash_idx, 0, &rsa_stat, &key);
+        err = rsa_verify_hash_ex(buffer, len, hash, hash_len, LTC_PKCS_1_V1_5, hash_idx, 0, &rsa_stat, &key);
     rsa_free(&key);
     if (err)
         return 0;
@@ -1672,7 +1672,7 @@ int __private_rsa_sign_hash_md5sha1(const unsigned char *in, unsigned long inlen
         return CRYPT_BUFFER_OVERFLOW;
     }
     x = modulus_bytelen;
-    err = pkcs_1_v1_5_encode(in, inlen, LTC_LTC_PKCS_1_EMSA, modulus_bitlen, NULL, 0, out, &x);
+    err = pkcs_1_v1_5_encode(in, inlen, LTC_PKCS_1_EMSA, modulus_bitlen, NULL, 0, out, &x);
     if (err != CRYPT_OK)
         return err;
     
@@ -1788,7 +1788,7 @@ int __private_tls_sign_rsa(struct TLSContext *context, unsigned int hash_type, c
             DEBUG_PRINT("Unsupported hash type: %i\n", hash_type);
             return TLS_GENERIC_ERROR;
         }
-        err = rsa_sign_hash_ex(hash, hash_len, out, outlen, LTC_LTC_PKCS_1_V1_5, NULL, find_prng("sprng"), hash_idx, 0, &key);
+        err = rsa_sign_hash_ex(hash, hash_len, out, outlen, LTC_PKCS_1_V1_5, NULL, find_prng("sprng"), hash_idx, 0, &key);
     }
     rsa_free(&key);
     if (err)
@@ -6880,7 +6880,7 @@ int tls_certificate_verify_signature(struct TLSCertificate *cert, struct TLSCert
         signature++;
         signature_len--;
     }
-    err = rsa_verify_hash_ex(signature, signature_len, cert->fingerprint, hash_len, LTC_LTC_PKCS_1_V1_5, hash_index, 0, &rsa_stat, &key);
+    err = rsa_verify_hash_ex(signature, signature_len, cert->fingerprint, hash_len, LTC_PKCS_1_V1_5, hash_index, 0, &rsa_stat, &key);
     rsa_free(&key);
     if (err) {
         DEBUG_PRINT("HASH VERIFY ERROR %i\n", err);
