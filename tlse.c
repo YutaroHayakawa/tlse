@@ -41,6 +41,9 @@
 #include <unistd.h>
 #endif
 
+// yutaro: use openssl rand_bytes
+#include <openssl/rand.h>
+
 #ifdef TLS_AMALGAMATION
 #include "libtomcrypt.c"
 #else
@@ -3496,12 +3499,18 @@ int tls_random(unsigned char *key, int len) {
         CryptReleaseContext(hProvider, 0);
     }
 #else
+    /*
     FILE *fp = fopen("/dev/urandom", "r");
     if (fp) {
         int key_len = fread(key, 1, len, fp);
         fclose(fp);
         if (key_len == len)
             return 1;
+    }
+    */
+
+    if (RAND_bytes(key, len)) {
+        return 1;
     }
 #endif
 #endif
@@ -8143,6 +8152,7 @@ void tls_print_certificate(const char *fname) {
 }
 #endif
 
+#undef SSL_COMPATIBLE_INTERFACE
 #ifdef SSL_COMPATIBLE_INTERFACE
 
 int  SSL_library_init() {
