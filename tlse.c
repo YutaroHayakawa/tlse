@@ -147,6 +147,7 @@
 #define VERSION_SUPPORTED(version, err)  if ((version != TLS_V12) && (version != TLS_V11) && (version != TLS_V10) && (version != DTLS_V12) && (version != DTLS_V10)) { if ((version == SSL_V30) && (context->connection_status == 0)) { version = TLS_V12; } else { DEBUG_PRINT("UNSUPPORTED TLS VERSION %x\n", (int)version); return err;} }
 #define CHECK_SIZE(size, buf_size, err)  if (((int)size > (int)buf_size) || ((int)buf_size < 0)) return err;
 #define TLS_IMPORT_CHECK_SIZE(buf_pos, size, buf_size) if (((int)size > (int)buf_size - buf_pos) || ((int)buf_pos > (int)buf_size)) { DEBUG_PRINT("IMPORT ELEMENT SIZE ERROR\n"); tls_destroy_context(context); return NULL; }
+#define TLS_IMPORT_CHECK_SIZE2(buf_pos, size, buf_size) if (((int)size > (int)buf_size - buf_pos) || ((int)buf_pos > (int)buf_size)) { DEBUG_PRINT("IMPORT ELEMENT SIZE ERROR\n"); tls_destroy_context(context); return -1; }
 #define CHECK_HANDSHAKE_STATE(context, n, limit)  { if (context->hs_messages[n] >= limit) { DEBUG_PRINT("* UNEXPECTED MESSAGE (%i)\n", (int)n); payload_res = TLS_UNEXPECTED_MESSAGE; break; } context->hs_messages[n]++; }
 
 #ifdef TLS_WITH_CHACHA20_POLY1305
@@ -8001,6 +8002,198 @@ struct TLSContext *tls_import_context(unsigned char *buffer, unsigned int buf_le
         }
     }
     return context;
+}
+
+// Added by Yutaro Hayakawa
+ssize_t tls_import_context2(struct TLSContext *context, uint8_t *buffer, size_t buf_len) {
+    if ((!buffer) || (buf_len < 64) || (buffer[0] != TLS_SERIALIZED_OBJECT) || (buffer[5] != 0x01)) {
+        DEBUG_PRINT("CANNOT IMPORT CONTEXT BUFFER\n");
+        return -1;
+    }
+
+    if (context) {
+        unsigned char temp[0xFF];
+        context->version = ntohs(*(unsigned short *)&buffer[1]);
+        unsigned short length = ntohs(*(unsigned short *)&buffer[3]);
+        if (length != buf_len - 5) {
+            DEBUG_PRINT("INVALID IMPORT BUFFER SIZE\n");
+            tls_destroy_context(context);
+            return -1;
+        }
+        context->connection_status = buffer[6];
+        context->cipher = ntohs(*(unsigned short *)&buffer[7]);
+        unsigned char server = buffer[9];
+        if (server == 2) {
+            context->is_server = 1;
+            context->is_child = 1;
+        } else
+            context->is_server = server;
+        
+        unsigned char local_iv[__TLS_AES_IV_LENGTH];
+        unsigned char remote_iv[__TLS_AES_IV_LENGTH];
+        unsigned char iv_len = buffer[10];
+        if (iv_len >  __TLS_AES_IV_LENGTH) {
+            DEBUG_PRINT("INVALID IV LENGTH\n");
+            tls_destroy_context(context);
+            return -1;
+        }
+        
+        // get the initialization vectors
+        int buf_pos = 11;
+        memcpy(local_iv, &buffer[buf_pos], iv_len);
+        buf_pos += iv_len;
+        memcpy(remote_iv, &buffer[buf_pos], iv_len);
+        buf_pos += iv_len;
+        
+        unsigned char key_lengths = buffer[buf_pos++];
+        TLS_IMPORT_CHECK_SIZE2(buf_pos, key_lengths, buf_len)
+        memcpy(temp, &buffer[buf_pos], key_lengths);
+        buf_pos += key_lengths;
+#ifdef TLS_REEXPORTABLE
+        context->exportable_keys = (unsigned char *)TLS_MALLOC(key_lengths);
+        memcpy(context->exportable_keys, temp, key_lengths);
+        context->exportable_size = key_lengths;
+#endif
+        int is_aead = __private_tls_is_aead(context);
+#ifdef TLS_WITH_CHACHA20_POLY1305
+        if (is_aead == 2) {
+            // ChaCha20
+            if (iv_len > __TLS_CHACHA20_IV_LENGTH)
+                iv_len = __TLS_CHACHA20_IV_LENGTH;
+            memcpy(context->crypto.ctx_local_mac.local_nonce, local_iv, iv_len);
+            memcpy(context->crypto.ctx_remote_mac.remote_nonce, remote_iv, iv_len);
+        } else
+#endif
+        if (is_aead) {
+            if (iv_len > __TLS_AES_GCM_IV_LENGTH)
+                iv_len = __TLS_AES_GCM_IV_LENGTH;
+            memcpy(context->crypto.ctx_local_mac.local_aead_iv, local_iv, iv_len);
+            memcpy(context->crypto.ctx_remote_mac.remote_aead_iv, remote_iv, iv_len);
+        }
+        if (context->is_server) {
+            if (__private_tls_crypto_create(context, key_lengths / 2, iv_len, temp, local_iv, temp + key_lengths / 2, remote_iv)) {
+                DEBUG_PRINT("ERROR CREATING KEY CONTEXT\n");
+                tls_destroy_context(context);
+                return -1;
+            }
+        } else {
+            if (__private_tls_crypto_create(context, key_lengths / 2, iv_len, temp + key_lengths / 2, remote_iv, temp, local_iv)) {
+                DEBUG_PRINT("ERROR CREATING KEY CONTEXT (CLIENT)\n");
+                tls_destroy_context(context);
+                return -1;
+            }
+        }
+        memset(temp, 0, sizeof(temp));
+        
+        unsigned char mac_length = buffer[buf_pos++];
+        if (mac_length > __TLS_MAX_MAC_SIZE) {
+            DEBUG_PRINT("INVALID MAC SIZE\n");
+            tls_destroy_context(context);
+            return -1;
+        }
+        
+        if (mac_length) {
+            TLS_IMPORT_CHECK_SIZE2(buf_pos, mac_length, buf_len)
+            memcpy(context->crypto.ctx_local_mac.local_mac, &buffer[buf_pos], mac_length);
+            buf_pos += mac_length;
+            
+            TLS_IMPORT_CHECK_SIZE2(buf_pos, mac_length, buf_len)
+            memcpy(context->crypto.ctx_remote_mac.remote_mac, &buffer[buf_pos], mac_length);
+            buf_pos += mac_length;
+        } else
+#ifdef TLS_WITH_CHACHA20_POLY1305
+        if (is_aead == 2) {
+            // ChaCha20
+            unsigned int i;
+            TLS_IMPORT_CHECK_SIZE2(buf_pos, 128 + CHACHA_BLOCKLEN * 2, buf_len)
+            for (i = 0; i < 16; i++) {
+                context->crypto.ctx_local.chacha_local.input[i] = ntohl(*(unsigned int *)&buffer[buf_pos]);
+                buf_pos += sizeof(unsigned int);
+            }
+            for (i = 0; i < 16; i++) {
+                context->crypto.ctx_remote.chacha_remote.input[i] = ntohl(*(unsigned int *)&buffer[buf_pos]);
+                buf_pos += sizeof(unsigned int);
+            }
+            memcpy(context->crypto.ctx_local.chacha_local.ks, &buffer[buf_pos], CHACHA_BLOCKLEN);
+            buf_pos += CHACHA_BLOCKLEN;
+            memcpy(context->crypto.ctx_remote.chacha_remote.ks, &buffer[buf_pos], CHACHA_BLOCKLEN);
+            buf_pos += CHACHA_BLOCKLEN;
+        }
+#endif
+        
+        TLS_IMPORT_CHECK_SIZE2(buf_pos, 2, buf_len)
+        unsigned short master_key_len = ntohs(*(unsigned short *)&buffer[buf_pos]);
+        buf_pos += 2;
+        if (master_key_len) {
+            TLS_IMPORT_CHECK_SIZE2(buf_pos, master_key_len, buf_len)
+            context->master_key = (unsigned char *)TLS_MALLOC(master_key_len);
+            if (context->master_key) {
+                memcpy(context->master_key, &buffer[buf_pos], master_key_len);
+                context->master_key_len = master_key_len;
+            }
+            buf_pos += master_key_len;
+        }
+        
+        TLS_IMPORT_CHECK_SIZE2(buf_pos, 16, buf_len)
+        
+        context->local_sequence_number = ntohll(*(uint64_t *)&buffer[buf_pos]);
+        buf_pos += 8;
+        context->remote_sequence_number = ntohll(*(uint64_t *)&buffer[buf_pos]);
+        buf_pos += 8;
+        
+        TLS_IMPORT_CHECK_SIZE2(buf_pos, 4, buf_len)
+        unsigned int tls_buffer_len = ntohl(*(unsigned int *)&buffer[buf_pos]);
+        buf_pos += 4;
+        TLS_IMPORT_CHECK_SIZE2(buf_pos, tls_buffer_len, buf_len)
+        if (tls_buffer_len) {
+            context->tls_buffer = (unsigned char *)TLS_MALLOC(tls_buffer_len);
+            if (context->tls_buffer) {
+                memcpy(context->tls_buffer, &buffer[buf_pos], tls_buffer_len);
+                context->tls_buffer_len = tls_buffer_len;
+            }
+            buf_pos += tls_buffer_len;
+        }
+        
+        TLS_IMPORT_CHECK_SIZE2(buf_pos, 4, buf_len)
+        unsigned int message_buffer_len = ntohl(*(unsigned int *)&buffer[buf_pos]);
+        buf_pos += 4;
+        TLS_IMPORT_CHECK_SIZE2(buf_pos, message_buffer_len, buf_len)
+        if (message_buffer_len) {
+            context->message_buffer = (unsigned char *)TLS_MALLOC(message_buffer_len);
+            if (context->message_buffer) {
+                memcpy(context->message_buffer, &buffer[buf_pos], message_buffer_len);
+                context->message_buffer_len = message_buffer_len;
+            }
+            buf_pos += message_buffer_len;
+        }
+        
+        TLS_IMPORT_CHECK_SIZE2(buf_pos, 4, buf_len)
+        unsigned int application_buffer_len = ntohl(*(unsigned int *)&buffer[buf_pos]);
+        buf_pos += 4;
+        context->cipher_spec_set = 1;
+        TLS_IMPORT_CHECK_SIZE2(buf_pos, application_buffer_len, buf_len)
+        if (application_buffer_len) {
+            context->application_buffer = (unsigned char *)TLS_MALLOC(application_buffer_len);
+            if (context->application_buffer) {
+                memcpy(context->application_buffer, &buffer[buf_pos], application_buffer_len);
+                context->application_buffer_len = application_buffer_len;
+            }
+            buf_pos += application_buffer_len;
+        }
+        TLS_IMPORT_CHECK_SIZE2(buf_pos, 1, buf_len)
+        context->dtls = buffer[buf_pos];
+        buf_pos++;
+        if (context->dtls) {
+            TLS_IMPORT_CHECK_SIZE2(buf_pos, 4, buf_len)
+            context->dtls_epoch_local = ntohs(*(unsigned short *)&buffer[buf_pos]);
+            buf_pos += 2;
+            context->dtls_epoch_remote = ntohs(*(unsigned short *)&buffer[buf_pos]);
+        }
+
+        return (ssize_t)buf_pos;
+    }
+
+    return -1;
 }
 
 int tls_is_broken(struct TLSContext *context) {
