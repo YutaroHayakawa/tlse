@@ -224,6 +224,7 @@ void tls_make_exportable(struct TLSContext *context, unsigned char exportable_fl
 int tls_export_context(struct TLSContext *context, unsigned char *buffer, unsigned int buf_len, unsigned char small_version);
 struct TLSContext *tls_import_context(unsigned char *buffer, unsigned int buf_len);
 ssize_t tls_import_context2(struct TLSContext *context, uint8_t *buffer, size_t buf_len);
+struct TLSContext *tls_import_context3(uint8_t *buffer, size_t buf_len, ssize_t *consumed);
 int tls_is_broken(struct TLSContext *context);
 int tls_request_client_certificate(struct TLSContext *context);
 int tls_client_verified(struct TLSContext *context);

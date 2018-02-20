@@ -15916,16 +15916,16 @@ void rsa_free(rsa_key *key);
 
 /* These use LTC_PKCS #1 v2.0 padding */
  #define rsa_encrypt_key(_in, _inlen, _out, _outlen, _lparam, _lparamlen, _prng, _prng_idx, _hash_idx, _key) \
-    rsa_encrypt_key_ex(_in, _inlen, _out, _outlen, _lparam, _lparamlen, _prng, _prng_idx, _hash_idx, LTC_LTC_PKCS_1_OAEP, _key)
+    rsa_encrypt_key_ex(_in, _inlen, _out, _outlen, _lparam, _lparamlen, _prng, _prng_idx, _hash_idx, LTC_PKCS_1_OAEP, _key)
 
  #define rsa_decrypt_key(_in, _inlen, _out, _outlen, _lparam, _lparamlen, _hash_idx, _stat, _key) \
-    rsa_decrypt_key_ex(_in, _inlen, _out, _outlen, _lparam, _lparamlen, _hash_idx, LTC_LTC_PKCS_1_OAEP, _stat, _key)
+    rsa_decrypt_key_ex(_in, _inlen, _out, _outlen, _lparam, _lparamlen, _hash_idx, LTC_PKCS_1_OAEP, _stat, _key)
 
  #define rsa_sign_hash(_in, _inlen, _out, _outlen, _prng, _prng_idx, _hash_idx, _saltlen, _key) \
-    rsa_sign_hash_ex(_in, _inlen, _out, _outlen, LTC_LTC_PKCS_1_PSS, _prng, _prng_idx, _hash_idx, _saltlen, _key)
+    rsa_sign_hash_ex(_in, _inlen, _out, _outlen, LTC_PKCS_1_PSS, _prng, _prng_idx, _hash_idx, _saltlen, _key)
 
  #define rsa_verify_hash(_sig, _siglen, _hash, _hashlen, _hash_idx, _saltlen, _stat, _key) \
-    rsa_verify_hash_ex(_sig, _siglen, _hash, _hashlen, LTC_LTC_PKCS_1_PSS, _hash_idx, _saltlen, _stat, _key)
+    rsa_verify_hash_ex(_sig, _siglen, _hash, _hashlen, LTC_PKCS_1_PSS, _hash_idx, _saltlen, _stat, _key)
 
 /* These can be switched between LTC_PKCS #1 v2.x and LTC_PKCS #1 v1.5 paddings */
 int rsa_encrypt_key_ex(const unsigned char *in, unsigned long inlen,
@@ -16989,14 +16989,14 @@ void crypt_argchk(char *v, char *s, int d);
 #ifdef LTC_PKCS_1
 
 enum ltc_pkcs_1_v1_5_blocks {
-    LTC_LTC_PKCS_1_EMSA = 1,        /* Block type 1 (LTC_PKCS #1 v1.5 signature padding) */
-    LTC_LTC_PKCS_1_EME  = 2         /* Block type 2 (LTC_PKCS #1 v1.5 encryption padding) */
+    LTC_PKCS_1_EMSA = 1,        /* Block type 1 (LTC_PKCS #1 v1.5 signature padding) */
+    LTC_PKCS_1_EME  = 2         /* Block type 2 (LTC_PKCS #1 v1.5 encryption padding) */
 };
 
 enum ltc_pkcs_1_paddings {
-    LTC_LTC_PKCS_1_V1_5 = 1,        /* LTC_PKCS #1 v1.5 padding (\sa ltc_pkcs_1_v1_5_blocks) */
-    LTC_LTC_PKCS_1_OAEP = 2,        /* LTC_PKCS #1 v2.0 encryption padding */
-    LTC_LTC_PKCS_1_PSS  = 3         /* LTC_PKCS #1 v2.1 signature padding */
+    LTC_PKCS_1_V1_5 = 1,        /* LTC_PKCS #1 v1.5 padding (\sa ltc_pkcs_1_v1_5_blocks) */
+    LTC_PKCS_1_OAEP = 2,        /* LTC_PKCS #1 v2.0 encryption padding */
+    LTC_PKCS_1_PSS  = 3         /* LTC_PKCS #1 v2.1 signature padding */
 };
 
 int pkcs_1_mgf1(int hash_idx,
@@ -27924,7 +27924,7 @@ int pkcs_1_v1_5_decode(const unsigned char *msg,
         goto bail;
     }
 
-    if (block_type == LTC_LTC_PKCS_1_EME) {
+    if (block_type == LTC_PKCS_1_EME) {
         for (i = 2; i < modulus_len; i++) {
             /* separator */
             if (msg[i] == 0x00) {
@@ -28004,8 +28004,8 @@ bail:
  *  \param msglen           The length of the data to encode (octets)
  *  \param block_type       Block type to use in padding (\sa ltc_pkcs_1_v1_5_blocks)
  *  \param modulus_bitlen   The bit length of the RSA modulus
- *  \param prng             An active PRNG state (only for LTC_LTC_PKCS_1_EME)
- *  \param prng_idx         The index of the PRNG desired (only for LTC_LTC_PKCS_1_EME)
+ *  \param prng             An active PRNG state (only for LTC_PKCS_1_EME)
+ *  \param prng_idx         The index of the PRNG desired (only for LTC_PKCS_1_EME)
  *  \param out              [out] The destination for the encoded data
  *  \param outlen           [in/out] The max size and resulting size of the encoded data
  *
@@ -28024,12 +28024,12 @@ int pkcs_1_v1_5_encode(const unsigned char *msg,
     int           result;
 
     /* valid block_type? */
-    if ((block_type != LTC_LTC_PKCS_1_EMSA) &&
-        (block_type != LTC_LTC_PKCS_1_EME)) {
+    if ((block_type != LTC_PKCS_1_EMSA) &&
+        (block_type != LTC_PKCS_1_EME)) {
         return CRYPT_PK_INVALID_PADDING;
     }
 
-    if (block_type == LTC_LTC_PKCS_1_EME) {  /* encryption padding, we need a valid PRNG */
+    if (block_type == LTC_PKCS_1_EME) {  /* encryption padding, we need a valid PRNG */
         if ((result = prng_is_valid(prng_idx)) != CRYPT_OK) {
             return result;
         }
@@ -28052,7 +28052,7 @@ int pkcs_1_v1_5_encode(const unsigned char *msg,
     ps     = &out[2];
     ps_len = modulus_len - msglen - 3;
 
-    if (block_type == LTC_LTC_PKCS_1_EME) {
+    if (block_type == LTC_PKCS_1_EME) {
         /* now choose a random ps */
         if (prng_descriptor[prng_idx].read(ps, ps_len, prng) != ps_len) {
             result = CRYPT_ERROR_READPRNG;
@@ -28428,7 +28428,7 @@ int rng_make_prng(int bits, int wprng, prng_state *prng,
    @param lparam      The system "lparam" value
    @param lparamlen   The length of the lparam value (octets)
    @param hash_idx    The index of the hash desired
-   @param padding     Type of padding (LTC_LTC_PKCS_1_OAEP or LTC_LTC_PKCS_1_V1_5)
+   @param padding     Type of padding (LTC_PKCS_1_OAEP or LTC_PKCS_1_V1_5)
    @param stat        [out] Result of the decryption, 1==valid, 0==invalid
    @param key         The corresponding private RSA key
    @return CRYPT_OK if succcessul (even if invalid)
@@ -28452,12 +28452,12 @@ int rsa_decrypt_key_ex(const unsigned char *in, unsigned long inlen,
 
     /* valid padding? */
 
-    if ((padding != LTC_LTC_PKCS_1_V1_5) &&
-        (padding != LTC_LTC_PKCS_1_OAEP)) {
+    if ((padding != LTC_PKCS_1_V1_5) &&
+        (padding != LTC_PKCS_1_OAEP)) {
         return CRYPT_PK_INVALID_PADDING;
     }
 
-    if (padding == LTC_LTC_PKCS_1_OAEP) {
+    if (padding == LTC_PKCS_1_OAEP) {
         /* valid hash ? */
         if ((err = hash_is_valid(hash_idx)) != CRYPT_OK) {
             return err;
@@ -28486,13 +28486,13 @@ int rsa_decrypt_key_ex(const unsigned char *in, unsigned long inlen,
         return err;
     }
 
-    if (padding == LTC_LTC_PKCS_1_OAEP) {
+    if (padding == LTC_PKCS_1_OAEP) {
         /* now OAEP decode the packet */
         err = pkcs_1_oaep_decode(tmp, x, lparam, lparamlen, modulus_bitlen, hash_idx,
                                  out, outlen, stat);
     } else {
         /* now LTC_PKCS #1 v1.5 depad the packet */
-        err = pkcs_1_v1_5_decode(tmp, x, LTC_LTC_PKCS_1_EME, modulus_bitlen, out, outlen, stat);
+        err = pkcs_1_v1_5_decode(tmp, x, LTC_PKCS_1_EME, modulus_bitlen, out, outlen, stat);
     }
 
     XFREE(tmp);
@@ -28535,7 +28535,7 @@ int rsa_decrypt_key_ex(const unsigned char *in, unsigned long inlen,
     @param prng        An active PRNG
     @param prng_idx    The index of the desired prng
     @param hash_idx    The index of the desired hash
-    @param padding     Type of padding (LTC_LTC_PKCS_1_OAEP or LTC_LTC_PKCS_1_V1_5)
+    @param padding     Type of padding (LTC_PKCS_1_OAEP or LTC_PKCS_1_V1_5)
     @param key         The RSA key to encrypt to
     @return CRYPT_OK if successful
  */
@@ -28552,8 +28552,8 @@ int rsa_encrypt_key_ex(const unsigned char *in, unsigned long inlen,
     LTC_ARGCHK(key != NULL);
 
     /* valid padding? */
-    if ((padding != LTC_LTC_PKCS_1_V1_5) &&
-        (padding != LTC_LTC_PKCS_1_OAEP)) {
+    if ((padding != LTC_PKCS_1_V1_5) &&
+        (padding != LTC_PKCS_1_OAEP)) {
         return CRYPT_PK_INVALID_PADDING;
     }
 
@@ -28562,7 +28562,7 @@ int rsa_encrypt_key_ex(const unsigned char *in, unsigned long inlen,
         return err;
     }
 
-    if (padding == LTC_LTC_PKCS_1_OAEP) {
+    if (padding == LTC_PKCS_1_OAEP) {
         /* valid hash? */
         if ((err = hash_is_valid(hash_idx)) != CRYPT_OK) {
             return err;
@@ -28579,7 +28579,7 @@ int rsa_encrypt_key_ex(const unsigned char *in, unsigned long inlen,
         return CRYPT_BUFFER_OVERFLOW;
     }
 
-    if (padding == LTC_LTC_PKCS_1_OAEP) {
+    if (padding == LTC_PKCS_1_OAEP) {
         /* OAEP pad the key */
         x = *outlen;
         if ((err = pkcs_1_oaep_encode(in, inlen, lparam,
@@ -28590,7 +28590,7 @@ int rsa_encrypt_key_ex(const unsigned char *in, unsigned long inlen,
     } else {
         /* LTC_PKCS #1 v1.5 pad the key */
         x = *outlen;
-        if ((err = pkcs_1_v1_5_encode(in, inlen, LTC_LTC_PKCS_1_EME,
+        if ((err = pkcs_1_v1_5_encode(in, inlen, LTC_PKCS_1_EME,
                                       modulus_bitlen, prng, prng_idx,
                                       out, &x)) != CRYPT_OK) {
             return err;
@@ -29091,7 +29091,7 @@ cleanup:
    @param inlen     The length of the hash to sign (octets)
    @param out       [out] The signature
    @param outlen    [in/out] The max size and resulting size of the signature
-   @param padding   Type of padding (LTC_LTC_PKCS_1_PSS or LTC_LTC_PKCS_1_V1_5)
+   @param padding   Type of padding (LTC_PKCS_1_PSS or LTC_PKCS_1_V1_5)
    @param prng      An active PRNG state
    @param prng_idx  The index of the PRNG desired
    @param hash_idx  The index of the hash desired
@@ -29114,11 +29114,11 @@ int rsa_sign_hash_ex(const unsigned char *in, unsigned long inlen,
     LTC_ARGCHK(key != NULL);
 
     /* valid padding? */
-    if ((padding != LTC_LTC_PKCS_1_V1_5) && (padding != LTC_LTC_PKCS_1_PSS)) {
+    if ((padding != LTC_PKCS_1_V1_5) && (padding != LTC_PKCS_1_PSS)) {
         return CRYPT_PK_INVALID_PADDING;
     }
 
-    if (padding == LTC_LTC_PKCS_1_PSS) {
+    if (padding == LTC_PKCS_1_PSS) {
         /* valid prng and hash ? */
         if ((err = prng_is_valid(prng_idx)) != CRYPT_OK) {
             return err;
@@ -29138,7 +29138,7 @@ int rsa_sign_hash_ex(const unsigned char *in, unsigned long inlen,
         return CRYPT_BUFFER_OVERFLOW;
     }
 
-    if (padding == LTC_LTC_PKCS_1_PSS) {
+    if (padding == LTC_PKCS_1_PSS) {
         /* PSS pad the key */
         x = *outlen;
         if ((err = pkcs_1_pss_encode(in, inlen, saltlen, prng, prng_idx,
@@ -29181,7 +29181,7 @@ int rsa_sign_hash_ex(const unsigned char *in, unsigned long inlen,
         }
 
         x = *outlen;
-        if ((err = pkcs_1_v1_5_encode(tmpin, y, LTC_LTC_PKCS_1_EMSA,
+        if ((err = pkcs_1_v1_5_encode(tmpin, y, LTC_PKCS_1_EMSA,
                                       modulus_bitlen, NULL, 0,
                                       out, &x)) != CRYPT_OK) {
             XFREE(tmpin);
@@ -29225,7 +29225,7 @@ int rsa_sign_hash_ex(const unsigned char *in, unsigned long inlen,
    @param siglen           The length of the signature data (octets)
    @param hash             The hash of the message that was signed
    @param hashlen          The length of the hash of the message that was signed (octets)
-   @param padding          Type of padding (LTC_LTC_PKCS_1_PSS or LTC_LTC_PKCS_1_V1_5)
+   @param padding          Type of padding (LTC_PKCS_1_PSS or LTC_PKCS_1_V1_5)
    @param hash_idx         The index of the desired hash
    @param saltlen          The length of the salt used during signature
    @param stat             [out] The result of the signature comparison, 1==valid, 0==invalid
@@ -29251,12 +29251,12 @@ int rsa_verify_hash_ex(const unsigned char *sig, unsigned long siglen,
 
     /* valid padding? */
 
-    if ((padding != LTC_LTC_PKCS_1_V1_5) &&
-        (padding != LTC_LTC_PKCS_1_PSS)) {
+    if ((padding != LTC_PKCS_1_V1_5) &&
+        (padding != LTC_PKCS_1_PSS)) {
         return CRYPT_PK_INVALID_PADDING;
     }
 
-    if (padding == LTC_LTC_PKCS_1_PSS) {
+    if (padding == LTC_PKCS_1_PSS) {
         /* valid hash ? */
         if ((err = hash_is_valid(hash_idx)) != CRYPT_OK) {
             return err;
@@ -29291,7 +29291,7 @@ int rsa_verify_hash_ex(const unsigned char *sig, unsigned long siglen,
         return CRYPT_INVALID_PACKET;
     }
 
-    if (padding == LTC_LTC_PKCS_1_PSS) {
+    if (padding == LTC_PKCS_1_PSS) {
         /* PSS decode and verify it */
         err = pkcs_1_pss_decode(hash, hashlen, tmpbuf, x, saltlen, hash_idx, modulus_bitlen, stat);
     } else {
@@ -29315,7 +29315,7 @@ int rsa_verify_hash_ex(const unsigned char *sig, unsigned long siglen,
             goto bail_2;
         }
 
-        if ((err = pkcs_1_v1_5_decode(tmpbuf, x, LTC_LTC_PKCS_1_EMSA, modulus_bitlen, out, &outlen, &decoded)) != CRYPT_OK) {
+        if ((err = pkcs_1_v1_5_decode(tmpbuf, x, LTC_PKCS_1_EMSA, modulus_bitlen, out, &outlen, &decoded)) != CRYPT_OK) {
             XFREE(out);
             goto bail_2;
         }
